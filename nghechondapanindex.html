@@ -6,19 +6,57 @@
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
     <style>
-        body { background: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; }
-        .student-row { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
-        .name { font-weight: bold; width: 150px; color: #ffb7b2; }
-        input { width: 40px; height: 30px; text-align: center; text-transform: uppercase; border: 1px solid var(--blue); border-radius: 4px; background: #000; color: #fff; }
-        .score { color: #00ff00; font-weight: bold; font-size: 1.2rem; width: 50px; text-align: center; }
-        .correct { border: 2px solid #00ff00 !important; color: #00ff00; }
+        :root {
+            --blue: #1e88e5;
+            --peach: #ffb7b2;
+        }
+        body { background: #1a1a1a; color: white; font-family: 'Segoe UI', sans-serif; padding: 20px; margin: 0; }
+        h2 { text-align: center; color: var(--peach); text-transform: uppercase; letter-spacing: 2px; }
+        
+        .container { overflow-x: auto; background: #2d2d2d; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        
+        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        th, td { padding: 10px 5px; text-align: center; border-bottom: 1px solid #444; }
+        
+        th { background-color: #111; color: var(--peach); font-size: 0.8rem; position: sticky; top: 0; }
+        .col-name { width: 180px; text-align: left; padding-left: 15px; }
+        .col-score { width: 80px; color: #00ff00; font-size: 1.2rem; }
+
+        input { 
+            width: 30px; height: 30px; text-align: center; text-transform: uppercase; 
+            border: 1px solid #555; border-radius: 4px; background: #000; color: #fff;
+            outline: none; transition: 0.3s;
+        }
+        
+        /* Khi câu hỏi đã được Admin chốt đáp án */
+        input:disabled {
+            background: #222;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+
+        .correct { border: 2px solid #00ff00 !important; color: #00ff00 !important; font-weight: bold; background: rgba(0,255,0,0.1) !important; }
+        .wrong { border: 2px solid #ff4444 !important; color: #ff4444 !important; background: rgba(255,0,0,0.1) !important; }
+
+        .name-text { font-weight: bold; color: #fff; }
+        .status-msg { text-align: center; margin-bottom: 10px; font-size: 0.9rem; color: #00ff00; }
     </style>
 </head>
 <body>
 
-    <h2 style="text-align: center;">BẢNG ĐÁP ÁN TRỰC TUYẾN</h2>
-    <div id="studentContainer">
-        <p style="text-align: center;">Đang tải danh sách lớp...</p>
+    <h2>BẢNG ĐÁP ÁN NGHE PLAYTOEIC</h2>
+    <div class="status-msg">Nhiệm vụ Hệ thống: Điền đáp án đúng (Ô sẽ tự khóa khi admin công bố đáp án)</div>
+    
+    <div class="container">
+        <table id="answerTable">
+            <thead>
+                <tr id="headerRow">
+                    <th class="col-name">Họ và Tên</th>
+                    <th class="col-score">Điểm</th>
+                </tr>
+            </thead>
+            <tbody id="studentBody"></tbody>
+        </table>
     </div>
 
 <script>
@@ -33,7 +71,17 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const numQ = 4;
+    const numQ = 15;
+
+    function createHeader() {
+        const headerRow = document.getElementById('headerRow');
+        const scoreHeader = headerRow.lastElementChild;
+        for (let i = 1; i <= numQ; i++) {
+            const th = document.createElement('th');
+            th.innerText = i;
+            headerRow.insertBefore(th, scoreHeader);
+        }
+    }
 
     function sendAns(pId, qIdx, val) {
         db.ref(`class_room/answers/${pId}/${qIdx}`).set(val.toLowerCase());
@@ -41,24 +89,44 @@
 
     db.ref('class_room').on('value', snap => {
         const data = snap.val() || {};
-        const container = document.getElementById('studentContainer');
-        container.innerHTML = '';
+        const tbody = document.getElementById('studentBody');
+        tbody.innerHTML = '';
 
-        for(let id in data.players) {
-            let html = `<div class="student-row">
-                <div class="name">${data.players[id].name}</div>
-                <div class="inputs">`;
+        if (!data.players) return;
+
+        for (let id in data.players) {
+            const tr = document.createElement('tr');
+            let rowHtml = `<td class="col-name"><span class="name-text">${data.players[id].name}</span></td>`;
             
-            for(let i=0; i<numQ; i++) {
-                const val = data.answers?.[id]?.[i] || '';
-                const isCorrect = (data.finalized && val === data.correct_keys?.[i]) ? 'correct' : '';
-                html += `<input type="text" class="${isCorrect}" maxlength="1" value="${val}" oninput="sendAns('${id}', ${i}, this.value)"> `;
+            for (let i = 0; i < numQ; i++) {
+                const studentVal = data.answers?.[id]?.[i] || '';
+                const correctKey = data.correct_keys?.[i] || ''; // Đáp án từ Admin
+                
+                // KIỂM TRA: Nếu cột này Admin đã điền đáp án đúng (khác rỗng)
+                const isColumnLocked = (correctKey !== "");
+                
+                let statusClass = '';
+                if (isColumnLocked) {
+                    statusClass = (studentVal === correctKey) ? 'correct' : 'wrong';
+                }
+                
+                rowHtml += `<td>
+                    <input type="text" 
+                           class="${statusClass}" 
+                           maxlength="1" 
+                           value="${studentVal}" 
+                           ${isColumnLocked ? 'disabled' : ''} 
+                           oninput="sendAns('${id}', ${i}, this.value)">
+                </td>`;
             }
 
-            html += `</div><div class="score">${data.players[id].score || 0}</div></div>`;
-            container.innerHTML += html;
+            rowHtml += `<td class="col-score"><strong>${data.players[id].score || 0}</strong></td>`;
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
         }
     });
+
+    createHeader();
 </script>
 </body>
 </html>
