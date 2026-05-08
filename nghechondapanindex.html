@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>STUDENT - ĐIỀN ĐÁP ÁN</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <style>
+        body { background: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; }
+        .student-row { background: #333; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+        .name { font-weight: bold; width: 150px; color: #ffb7b2; }
+        input { width: 40px; height: 30px; text-align: center; text-transform: uppercase; border: 1px solid var(--blue); border-radius: 4px; background: #000; color: #fff; }
+        .score { color: #00ff00; font-weight: bold; font-size: 1.2rem; width: 50px; text-align: center; }
+        .correct { border: 2px solid #00ff00 !important; color: #00ff00; }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align: center;">BẢNG ĐÁP ÁN TRỰC TUYẾN</h2>
+    <div id="studentContainer">
+        <p style="text-align: center;">Đang tải danh sách lớp...</p>
+    </div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAhodfr-XjA3wzeeJTEdFRtn0KFBNJ4mLw",
+        authDomain: "nghe-chon-dap-an.firebaseapp.com",
+        databaseURL: "https://nghe-chon-dap-an-default-rtdb.firebaseio.com",
+        projectId: "nghe-chon-dap-an",
+        storageBucket: "nghe-chon-dap-an.firebasestorage.app",
+        messagingSenderId: "251465237282",
+        appId: "1:251465237282:web:de82395e7513a0774bdb7b",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const numQ = 4;
+
+    function sendAns(pId, qIdx, val) {
+        db.ref(`class_room/answers/${pId}/${qIdx}`).set(val.toLowerCase());
+    }
+
+    db.ref('class_room').on('value', snap => {
+        const data = snap.val() || {};
+        const container = document.getElementById('studentContainer');
+        container.innerHTML = '';
+
+        for(let id in data.players) {
+            let html = `<div class="student-row">
+                <div class="name">${data.players[id].name}</div>
+                <div class="inputs">`;
+            
+            for(let i=0; i<numQ; i++) {
+                const val = data.answers?.[id]?.[i] || '';
+                const isCorrect = (data.finalized && val === data.correct_keys?.[i]) ? 'correct' : '';
+                html += `<input type="text" class="${isCorrect}" maxlength="1" value="${val}" oninput="sendAns('${id}', ${i}, this.value)"> `;
+            }
+
+            html += `</div><div class="score">${data.players[id].score || 0}</div></div>`;
+            container.innerHTML += html;
+        }
+    });
+</script>
+</body>
+</html>
