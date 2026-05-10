@@ -28,7 +28,8 @@
             outline: none; transition: 0.3s;
         }
         
-        /* Khi câu hỏi đã được Admin chốt đáp án */
+        input:focus { border-color: var(--blue); box-shadow: 0 0 5px var(--blue); }
+
         input:disabled {
             background: #222;
             cursor: not-allowed;
@@ -45,7 +46,7 @@
 <body>
 
     <h2>BẢNG ĐÁP ÁN NGHE PLAYTOEIC</h2>
-    <div class="status-msg">Nhiệm vụ Hệ thống: Điền đáp án đúng (Ô sẽ tự khóa khi admin công bố đáp án)</div>
+    <div class="status-msg">Nhiệm vụ Hệ thống: Điền đáp án đúng (Nhập tối đa 3 chữ, tự động sửa AA)</div>
     
     <div class="container">
         <table id="answerTable">
@@ -83,18 +84,28 @@
         }
     }
 
+    // Hàm gửi đáp án: Xử lý Â thành AA
     function sendAns(pId, qIdx, val) {
-        // Chuyển Â thành AA và xóa khoảng trắng thừa
-        let finalVal = val.toUpperCase().replace(/Â/g, 'AA').trim();
-        db.ref(`class_room/answers/${pId}/${qIdx}`).set(finalVal.toLowerCase());
+        let processedVal = val.toUpperCase().replace(/Â/g, 'AA');
+        db.ref(`class_room/answers/${pId}/${qIdx}`).set(processedVal.toLowerCase());
     }
 
     db.ref('class_room').on('value', snap => {
         const data = snap.val() || {};
         const tbody = document.getElementById('studentBody');
-        tbody.innerHTML = '';
-
         if (!data.players) return;
+
+        // BƯỚC MẸO: Ghi nhớ ô người dùng đang focus trước khi vẽ lại bảng
+        const activeEl = document.activeElement;
+        let activeId = null;
+        let activeQ = null;
+        
+        if (activeEl && activeEl.tagName === 'INPUT') {
+            activeId = activeEl.getAttribute('data-id');
+            activeQ = activeEl.getAttribute('data-q');
+        }
+
+        tbody.innerHTML = '';
 
         for (let id in data.players) {
             const tr = document.createElement('tr');
@@ -102,29 +113,44 @@
             
             for (let i = 0; i < numQ; i++) {
                 const studentVal = data.answers?.[id]?.[i] || '';
-                const correctKey = data.correct_keys?.[i] || ''; // Đáp án từ Admin
-                
-                // KIỂM TRA: Nếu cột này Admin đã điền đáp án đúng (khác rỗng)
+                const correctKey = data.correct_keys?.[i] || '';
                 const isColumnLocked = (correctKey !== "");
                 
                 let statusClass = '';
                 if (isColumnLocked) {
                     statusClass = (studentVal === correctKey) ? 'correct' : 'wrong';
                 }
+
+                // Gán ID cho input để dễ tìm lại
+                const inputId = `input-${id}-${i}`;
                 
                 rowHtml += `<td>
                     <input type="text" 
+                           id="${inputId}"
                            class="${statusClass}" 
                            maxlength="3" 
+                           data-id="${id}" 
+                           data-q="${i}"
                            value="${studentVal}" 
                            ${isColumnLocked ? 'disabled' : ''} 
-                           oninput="sendAns('${id}', ${i}, this.value.toUpperCase().replace('Â', 'AA'))">
+                           oninput="sendAns('${id}', ${i}, this.value)">
                 </td>`;
             }
 
             rowHtml += `<td class="col-score"><strong>${data.players[id].score || 0}</strong></td>`;
             tr.innerHTML = rowHtml;
             tbody.appendChild(tr);
+        }
+
+        // BƯỚC MẸO: Sau khi vẽ xong bảng, trả lại tiêu điểm (focus) cho ô đang nhập dở
+        if (activeId && activeQ) {
+            const targetInput = document.getElementById(`input-${activeId}-${activeQ}`);
+            if (targetInput && !targetInput.disabled) {
+                targetInput.focus();
+                // Đưa con trỏ chuột về cuối văn bản trong ô
+                const len = targetInput.value.length;
+                targetInput.setSelectionRange(len, len);
+            }
         }
     });
 
