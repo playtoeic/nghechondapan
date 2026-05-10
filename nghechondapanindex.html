@@ -23,7 +23,7 @@
         .col-score { width: 80px; color: #00ff00; font-size: 1.2rem; }
 
         input { 
-            width: 30px; height: 30px; text-align: center; text-transform: uppercase; 
+            width: 55px; height: 30px; text-align: center; text-transform: uppercase; 
             border: 1px solid #555; border-radius: 4px; background: #000; color: #fff;
             outline: none; transition: 0.3s;
         }
@@ -84,7 +84,9 @@
     }
 
     function sendAns(pId, qIdx, val) {
-        db.ref(`class_room/answers/${pId}/${qIdx}`).set(val.toLowerCase());
+        // Chuyển Â thành AA và xóa khoảng trắng thừa
+        let finalVal = val.toUpperCase().replace(/Â/g, 'AA').trim();
+        db.ref(`class_room/answers/${pId}/${qIdx}`).set(finalVal.toLowerCase());
     }
 
     db.ref('class_room').on('value', snap => {
@@ -113,10 +115,10 @@
                 rowHtml += `<td>
                     <input type="text" 
                            class="${statusClass}" 
-                           maxlength="1" 
+                           maxlength="3" 
                            value="${studentVal}" 
                            ${isColumnLocked ? 'disabled' : ''} 
-                           oninput="sendAns('${id}', ${i}, this.value)">
+                           oninput="sendAns('${id}', ${i}, this.value.toUpperCase().replace('Â', 'AA'))">
                 </td>`;
             }
 
