@@ -36,12 +36,11 @@
             opacity: 0.8;
         }
 
-        /* Ô người khác đã điền (Tô xanh lá & Giấu chữ) */
+        /* Ô người khác đã điền: Tô màu xanh lá & Che đáp án */
         .has-answered { 
             background-color: #2e7d32 !important; 
             border: 1px solid #4caf50 !important; 
             color: transparent !important; 
-            cursor: not-allowed;
         }
 
         .correct { border: 2px solid #00ff00 !important; color: #00ff00 !important; font-weight: bold; background: rgba(0,255,0,0.1) !important; }
@@ -54,7 +53,7 @@
 <body>
 
     <h2>BẢNG ĐÁP ÁN NGHE PLAYTOEIC</h2>
-    <div class="status-msg" id="statusMsg">Nhiệm vụ Hệ thống: Điền đáp án đúng (Ô tự động khóa khi admin nhập kết quả)</div>
+    <div class="status-msg">Nhiệm vụ Hệ thống: Điền đáp án đúng (Ô tự động khóa khi admin nhập kết quả)</div>
     
     <div class="container">
         <table id="answerTable">
@@ -82,13 +81,8 @@
     const db = firebase.database();
     const numQ = 15;
 
-    // LẤY ID NGƯỜI DÙNG TỪ URL (Ví dụ: index.html?id=player1)
-    const urlParams = new URLSearchParams(window.location.search);
-    const CURRENT_PLAYER_ID = urlParams.get('id');
-
-    if (CURRENT_PLAYER_ID) {
-        document.getElementById('statusMsg').innerText = `Tài khoản của bạn: ${CURRENT_PLAYER_ID}`;
-    }
+    // Tự động nhớ ID người chơi trên trình duyệt này
+    let myPlayerId = localStorage.getItem('my_player_id') || null;
 
     function createHeader() {
         const headerRow = document.getElementById('headerRow');
@@ -100,9 +94,14 @@
         }
     }
 
-    // Hàm gửi đáp án: Chỉ cho phép chỉnh sửa đáp án của chính mình
+    // Gửi đáp án & lưu ID người chơi khi gõ ô đầu tiên
     function sendAns(pId, qIdx, val) {
-        if (pId !== CURRENT_PLAYER_ID) return;
+        if (!myPlayerId) {
+            myPlayerId = pId;
+            localStorage.setItem('my_player_id', pId);
+        } else if (myPlayerId !== pId) {
+            return; // Không cho sửa dòng của người khác
+        }
 
         let processedVal = val.toUpperCase().replace(/Â/g, 'AA');
         db.ref(`class_room/answers/${pId}/${qIdx}`).set(processedVal.toLowerCase());
@@ -113,7 +112,7 @@
         const tbody = document.getElementById('studentBody');
         if (!data.players) return;
 
-        // Ghi nhớ ô người dùng đang focus
+        // Ghi nhớ ô đang nhập
         const activeEl = document.activeElement;
         let activeId = null;
         let activeQ = null;
@@ -128,35 +127,28 @@
         for (let id in data.players) {
             const tr = document.createElement('tr');
             let rowHtml = `<td class="col-name"><span class="name-text">${data.players[id].name}</span></td>`;
-            const isSelf = (id === CURRENT_PLAYER_ID);
-            
+            const isSelf = (myPlayerId === id);
+
             for (let i = 0; i < numQ; i++) {
                 const studentVal = data.answers?.[id]?.[i] || '';
                 const correctKey = data.correct_keys?.[i] || '';
                 const isColumnLocked = (correctKey !== "");
-                const hasEnteredAnswer = studentVal.trim() !== '';
+                const hasEntered = studentVal.trim() !== '';
                 
                 let statusClass = '';
-                let displayVal = '';
-                let isDisabled = false;
+                let displayVal = studentVal;
+                let isDisabled = isColumnLocked;
 
                 if (isColumnLocked) {
-                    // CỘT ĐÃ KHÓA: Hiện tất cả đáp án + tô màu Đúng/Sai
-                    displayVal = studentVal;
+                    // KHI ĐÃ KHÓA: Hiện tất cả đáp án + chấm đúng sai
                     statusClass = (studentVal.toLowerCase() === correctKey.toLowerCase()) ? 'correct' : 'wrong';
-                    isDisabled = true;
                 } else {
-                    // CỘT CHƯA KHÓA:
-                    if (isSelf) {
-                        // Là chính mình -> Hiện chữ, cho phép nhập
-                        displayVal = studentVal;
-                        isDisabled = false;
-                    } else {
-                        // Là người khác -> Ẩn chữ, tô xanh nếu đã nhập, không cho sửa
-                        displayVal = '';
-                        isDisabled = true;
-                        if (hasEnteredAnswer) {
-                            statusClass = 'has-answered'; // Đổi nền màu xanh
+                    // KHI CHƯA KHÓA:
+                    if (myPlayerId && !isSelf) {
+                        isDisabled = true; // Khóa không cho nhập ô người khác
+                        if (hasEntered) {
+                            statusClass = 'has-answered'; // Tô xanh ô đã điền
+                            displayVal = '';              // Che đáp án
                         }
                     }
                 }
@@ -181,7 +173,7 @@
             tbody.appendChild(tr);
         }
 
-        // Khôi phục con trỏ chuột cho ô đang nhập
+        // Trả lại tiêu điểm cho ô đang gõ
         if (activeId && activeQ) {
             const targetInput = document.getElementById(`input-${activeId}-${activeQ}`);
             if (targetInput && !targetInput.disabled) {
