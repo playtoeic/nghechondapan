@@ -81,7 +81,6 @@
     const db = firebase.database();
     const numQ = 15;
 
-    // Tự động nhớ ID người chơi trên trình duyệt này
     let myPlayerId = localStorage.getItem('my_player_id') || null;
 
     function createHeader() {
@@ -110,7 +109,19 @@
     db.ref('class_room').on('value', snap => {
         const data = snap.val() || {};
         const tbody = document.getElementById('studentBody');
-        if (!data.players) return;
+        
+        if (!data.players) {
+            tbody.innerHTML = '';
+            myPlayerId = null;
+            localStorage.removeItem('my_player_id');
+            return;
+        }
+
+        // TỰ ĐỘNG SỬA LỖI: Nếu myPlayerId lưu trong máy không còn tồn tại trên Firebase, xóa đi để học sinh nhận lại ID mới
+        if (myPlayerId && !data.players[myPlayerId]) {
+            myPlayerId = null;
+            localStorage.removeItem('my_player_id');
+        }
 
         // Ghi nhớ ô đang nhập
         const activeEl = document.activeElement;
