@@ -93,7 +93,7 @@
         }
     }
 
-    // Gửi đáp án & lưu ID người chơi khi gõ ô đầu tiên
+    // Gửi đáp án & lưu ID người chơi ngay khi điền ô đầu tiên
     function sendAns(pId, qIdx, val) {
         if (!myPlayerId) {
             myPlayerId = pId;
@@ -117,13 +117,13 @@
             return;
         }
 
-        // TỰ ĐỘNG SỬA LỖI: Nếu myPlayerId lưu trong máy không còn tồn tại trên Firebase, xóa đi để học sinh nhận lại ID mới
+        // Tự động xóa ID cũ nếu danh sách học sinh bị Admin thay đổi/reset
         if (myPlayerId && !data.players[myPlayerId]) {
             myPlayerId = null;
             localStorage.removeItem('my_player_id');
         }
 
-        // Ghi nhớ ô đang nhập
+        // Ghi nhớ vị trí ô đang gõ
         const activeEl = document.activeElement;
         let activeId = null;
         let activeQ = null;
@@ -147,19 +147,32 @@
                 const hasEntered = studentVal.trim() !== '';
                 
                 let statusClass = '';
-                let displayVal = studentVal;
-                let isDisabled = isColumnLocked;
+                let displayVal = '';
+                let isDisabled = false;
 
                 if (isColumnLocked) {
-                    // KHI ĐÃ KHÓA: Hiện tất cả đáp án + chấm đúng sai
+                    // CỘT ĐÃ KHÓA: Hiện tất cả đáp án + chấm Đúng/Sai
+                    displayVal = studentVal;
                     statusClass = (studentVal.toLowerCase() === correctKey.toLowerCase()) ? 'correct' : 'wrong';
+                    isDisabled = true;
                 } else {
-                    // KHI CHƯA KHÓA:
-                    if (myPlayerId && !isSelf) {
-                        isDisabled = true; // Khóa không cho nhập ô người khác
+                    // CỘT CHƯA KHÓA:
+                    if (isSelf) {
+                        // Là dòng của mình -> Hiện chữ & Cho sửa
+                        displayVal = studentVal;
+                        isDisabled = false;
+                    } else {
+                        // Không phải dòng của mình (Hoặc chưa chọn tên):
+                        displayVal = ''; // LUÔN GIẤU CHỮ
+                        
                         if (hasEntered) {
                             statusClass = 'has-answered'; // Tô xanh ô đã điền
-                            displayVal = '';              // Che đáp án
+                        }
+
+                        if (myPlayerId) {
+                            isDisabled = true; // Đã nhận tên rồi -> Khóa dòng người khác
+                        } else {
+                            isDisabled = false; // Chưa nhận tên -> Cho chọn dòng
                         }
                     }
                 }
@@ -184,7 +197,7 @@
             tbody.appendChild(tr);
         }
 
-        // Trả lại tiêu điểm cho ô đang gõ
+        // Khôi phục con trỏ gõ đáp án
         if (activeId && activeQ) {
             const targetInput = document.getElementById(`input-${activeId}-${activeQ}`);
             if (targetInput && !targetInput.disabled) {
