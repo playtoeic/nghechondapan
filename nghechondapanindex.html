@@ -15,11 +15,12 @@
         
         .container { overflow-x: auto; background: #2d2d2d; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         
-        table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        /* Cập nhật min-width để không ép dẹp kích thước ô */
+        table { width: 100%; border-collapse: collapse; min-width: 2800px; }
         th, td { padding: 10px 5px; text-align: center; border-bottom: 1px solid #444; }
         
         th { background-color: #111; color: var(--peach); font-size: 0.8rem; position: sticky; top: 0; }
-        .col-name { width: 180px; text-align: left; padding-left: 15px; }
+        .col-name { width: 180px; text-align: left; padding-left: 15px; position: sticky; left: 0; background: #111; z-index: 2; } /* Cố định cột tên khi cuộn ngang */
         .col-score { width: 80px; color: #00ff00; font-size: 1.2rem; }
 
         input { 
@@ -79,7 +80,9 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
-    const numQ = 15;
+    
+    // TĂNG SỐ LƯỢNG CÂU HỎI LÊN 40
+    const numQ = 40;
 
     let myPlayerId = localStorage.getItem('my_player_id') || null;
 
